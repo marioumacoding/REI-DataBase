@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -7,14 +7,22 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import HCaptcha from "@hcaptcha/react-hcaptcha";
 import logo from "@/assets/logo.png";
+
+type CaptchaRef = {
+  resetCaptcha: () => void;
+};
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const captcha = useRef<CaptchaRef | null>(null);
+  const hcaptchaSiteKey = import.meta.env.VITE_HCAPTCHA_SITE_KEY as string | undefined;
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -28,24 +36,37 @@ const Auth = () => {
         if (error) throw error;
         navigate("/");
       } else {
+        if (!captchaToken) {
+          toast({
+            title: "Captcha required",
+            description: "Please complete the captcha challenge before signing up.",
+            variant: "destructive",
+          });
+          return;
+        }
+
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: { display_name: displayName },
             emailRedirectTo: window.location.origin,
+            captchaToken,
           },
         });
+        captcha.current?.resetCaptcha();
+        setCaptchaToken(null);
         if (error) throw error;
         toast({
           title: "Check your email",
           description: "We've sent you a verification link to confirm your account.",
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Something went wrong.";
       toast({
         title: "Error",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -107,6 +128,19 @@ const Auth = () => {
                 minLength={6}
               />
             </div>
+            {!isLogin && hcaptchaSiteKey && (
+              <div className="pt-1">
+                <HCaptcha
+                  ref={captcha}
+                  sitekey={hcaptchaSiteKey}
+                  onVerify={(token) => {
+                    setCaptchaToken(token);
+                  }}
+                  onExpire={() => setCaptchaToken(null)}
+                  onError={() => setCaptchaToken(null)}
+                />
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="animate-spin" />}
               {isLogin ? "Sign In" : "Sign Up"}
