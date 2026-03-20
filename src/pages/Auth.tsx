@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import HCaptcha from "@hcaptcha/react-hcaptcha";
+import { Turnstile } from "@marsidev/react-turnstile";
 import logo from "@/assets/logo.png";
 
 type CaptchaRef = {
@@ -21,8 +21,8 @@ const Auth = () => {
   const [displayName, setDisplayName] = useState("");
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const captcha = useRef<CaptchaRef | null>(null);
-  const hcaptchaSiteKey = import.meta.env.VITE_HCAPTCHA_SITE_KEY as string | undefined;
+  // Cloudflare Turnstile site key from env
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -32,14 +32,23 @@ const Auth = () => {
 
     try {
       if (isLogin) {
+        // Sign-in should NOT require captcha
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (error) {
+          toast({
+            title: "Sign in failed",
+            description: error.message || "Unknown error.",
+            variant: "destructive",
+          });
+          return;
+        }
         navigate("/");
       } else {
+        // Sign-up requires captcha
         if (!captchaToken) {
           toast({
             title: "Captcha required",
-            description: "Please complete the captcha challenge before signing up.",
+            description: "Please complete the CAPTCHA challenge before signing up.",
             variant: "destructive",
           });
           return;
@@ -54,16 +63,22 @@ const Auth = () => {
             captchaToken,
           },
         });
-        captcha.current?.resetCaptcha();
         setCaptchaToken(null);
-        if (error) throw error;
+        if (error) {
+          toast({
+            title: "Sign up failed",
+            description: error.message || "Unknown error.",
+            variant: "destructive",
+          });
+          return;
+        }
         toast({
           title: "Check your email",
           description: "We've sent you a verification link to confirm your account.",
         });
       }
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Something went wrong.";
+      const message = error instanceof Error ? error.message : JSON.stringify(error);
       toast({
         title: "Error",
         description: message,
@@ -128,16 +143,14 @@ const Auth = () => {
                 minLength={6}
               />
             </div>
-            {!isLogin && hcaptchaSiteKey && (
+            {!isLogin && turnstileSiteKey && (
               <div className="pt-1">
-                <HCaptcha
-                  ref={captcha}
-                  sitekey={hcaptchaSiteKey}
-                  onVerify={(token) => {
-                    setCaptchaToken(token);
-                  }}
-                  onExpire={() => setCaptchaToken(null)}
+                <Turnstile
+                  siteKey={turnstileSiteKey}
+                  onSuccess={(token) => setCaptchaToken(token)}
                   onError={() => setCaptchaToken(null)}
+                  onExpire={() => setCaptchaToken(null)}
+                  options={{ theme: "light" }}
                 />
               </div>
             )}
