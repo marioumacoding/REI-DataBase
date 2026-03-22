@@ -31,7 +31,22 @@ const Index = () => {
   const [chartFilter, setChartFilter] = useState<ChartFilter | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
 
-  const { data: properties = [], isLoading } = useProperties();
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
+  const { data, isLoading } = useProperties({
+    page,
+    pageSize,
+    filters: {
+      first_name: filters.name,
+      last_name: filters.name,
+      client_name: filters.client,
+      address: filters.address,
+      state: filters.state,
+      phone_1: filters.phone,
+    },
+  });
+  const properties = data?.data ?? [];
+  const total = data?.total ?? 0;
   const queryClient = useQueryClient();
 
   const chartFilteredData = useMemo(() => {
@@ -116,6 +131,32 @@ const Index = () => {
                 onSelectRow={setSelectedProperty}
                 selectedId={selectedProperty?.id}
               />
+              <div className="flex items-center justify-center gap-4 mt-4">
+                <button
+                  className="px-3 py-1 rounded bg-muted text-xs"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                >
+                  Prev
+                </button>
+                <span className="text-xs">Page {page + 1} of {Math.max(1, Math.ceil(total / pageSize))}</span>
+                <button
+                  className="px-3 py-1 rounded bg-muted text-xs"
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={properties.length < pageSize}
+                >
+                  Next
+                </button>
+                <select
+                  className="px-3 py-1 rounded bg-muted text-xs"
+                  value={pageSize}
+                  onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
+                >
+                  {[25, 50, 100, 200].map((n) => (
+                    <option key={n} value={n}>{n} per page</option>
+                  ))}
+                </select>
+              </div>
             </>
           )}
         </div>

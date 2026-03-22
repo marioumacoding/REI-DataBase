@@ -17,8 +17,6 @@ interface DataTableProps {
   selectedId?: number | null;
 }
 
-const PAGE_SIZES = [25, 50, 100];
-
 const DataTable = ({ data, filters, chartFilter, onSelectRow, selectedId }: DataTableProps) => {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
@@ -277,48 +275,6 @@ const DataTable = ({ data, filters, chartFilter, onSelectRow, selectedId }: Data
               )}
             </TableBody>
           </Table>
-        </div>
-
-        {/* Pagination */}
-        <div className="border-t border-border px-4 py-2.5 flex items-center justify-between bg-muted/10">
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-muted-foreground">Rows per page</span>
-            <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(0); }}>
-              <SelectTrigger className="h-7 w-16 text-xs bg-secondary border-border">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-card border-border">
-                {PAGE_SIZES.map((s) => (
-                  <SelectItem key={s} value={String(s)}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] text-muted-foreground">
-              {filtered.length > 0 ? `${page * pageSize + 1}–${Math.min((page + 1) * pageSize, filtered.length)} of ` : "0 of "}{filtered.length.toLocaleString()}
-            </span>
-            <div className="flex gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 hover:!bg-primary/5 hover:!text-primary"
-                disabled={page === 0}
-                onClick={() => setPage(page - 1)}
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 hover:!bg-primary/5 hover:!text-primary"
-                disabled={page >= totalPages - 1}
-                onClick={() => setPage(page + 1)}
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </Button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

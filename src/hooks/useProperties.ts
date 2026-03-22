@@ -2,53 +2,40 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Property } from "@/lib/types";
 
-const PAGE_SIZE = 1000;
-const PARALLEL_PAGES = 10;
-
-async function fetchAllPages(table: string): Promise<any[]> {
-  const { count, error: countError } = await supabase
-    .from(table as any)
-    .select("*", { count: "exact", head: true });
-  if (countError) throw countError;
-
-  const total = count ?? 0;
-  if (total === 0) return [];
-
-  const numPages = Math.ceil(total / PAGE_SIZE);
-  const all: any[] = [];
-
-  for (let batch = 0; batch < numPages; batch += PARALLEL_PAGES) {
-    const batchSize = Math.min(PARALLEL_PAGES, numPages - batch);
-    const results = await Promise.all(
-      Array.from({ length: batchSize }, (_, i) => {
-        const from = (batch + i) * PAGE_SIZE;
-        return supabase
-          .from(table as any)
-          .select("*")
-          .order("id", { ascending: true })
-          .range(from, from + PAGE_SIZE - 1);
-      })
-    );
-    for (const { data, error } of results) {
-      if (error) throw error;
-      all.push(...(data ?? []));
-    }
-  }
-
-  return all;
+export interface UsePropertiesOptions {
+  page: number;
+  pageSize: number;
+  filters?: Partial<Pick<Property, "first_name" | "last_name" | "client_name" | "address" | "state" | "phone_1">>;
 }
 
-export const useProperties = () => {
+export const useProperties = ({ page, pageSize, filters }: UsePropertiesOptions) => {
   return useQuery({
-    queryKey: ["properties"],
-    queryFn: async (): Promise<Property[]> => {
-      const all = await fetchAllPages("properties_view");
-      console.log("[useProperties] total rows fetched:", all.length);
-      return all.map((row: any) => ({
-        ...row,
-        id: Number(row.id),
-        created_at: row.created_at ?? "",
-      }));
+    queryKey: ["properties", page, pageSize, filters],
+    queryFn: async (): Promise<{ data: Property[]; total: number }> => {
+      let query = supabase.from("properties_view" as any).select("*", { count: "exact" });
+      // Apply filters server-side if provided
+      if (filters) {
+        if (filters.first_name) query = query.ilike("first_name", `%${filters.first_name}%`);
+        if (filters.last_name) query = query.ilike("last_name", `%${filters.last_name}%`);
+        if (filters.client_name) query = query.ilike("client_name", `%${filters.client_name}%`);
+        if (filters.address) query = query.ilike("address", `%${filters.address}%`);
+        if (filters.state && filters.state !== "All") query = query.eq("state", filters.state);
+        if (filters.phone_1) query = query.ilike("phone_1", `%${filters.phone_1}%`);
+      }
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+      query = query.order("id", { ascending: true }).range(from, to);
+      const { data, error, count } = await query;
+      if (error) throw error;
+      return {
+        data: (data ?? []).map((row: any) => ({
+          ...row,
+          id: Number(row.id),
+          created_at: row.created_at ?? "",
+        })),
+        total: count ?? 0,
+      };
     },
+    placeholderData: () => ({ data: [], total: 0 }),
   });
 };
